@@ -324,6 +324,8 @@ Cr：反映了RGB输入信号红色部分与RGB信号亮度值之间的差异。
 [详解YUV颜色体系](https://www.jianshu.com/p/e4944a2707bc)
 
 
+# FFmpeg时间戳详解
+[FFmpeg时间戳详解](https://www.cnblogs.com/leisure_chn/p/10584910.html)
 
 
 
