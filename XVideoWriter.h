@@ -1,74 +1,55 @@
+#pragma once
 #include <iostream>
-#include "XVideoWriter.h"
-using namespace std;
-int main()
+class AVPacket;
+enum XSAMPLEFMT
 {
-	char outfile[] = "rgbpcm.mp4";
-	char rgbfile[] = "test.rgb";
-	char pcmfile[] = "test.pcm";
-	XVideoWriter* xw = XVideoWriter::Get(0);
-	cout << xw->Init(outfile) << endl;
-	cout << xw->ADDVideoStream() << endl;
-	xw->ADDAudioStream();
-	FILE* fp = fopen(rgbfile, "rb");
-	if (!fp)
-	{
-		cout << "open file " << rgbfile << " fail!\n";
-		return -1;
-	}
-	cout << "open file " << rgbfile << " success!\n";
-
-	FILE* fa = fopen(pcmfile, "rb");
-	if (!fp)
-	{
-		cout << "open file " << pcmfile << " fail!\n";
-		return -1;
-	}
-	cout << "open file " << pcmfile << " success!\n";
-
-	int size = xw->inWidth * xw->inHeight * 4;
-	unsigned char* rgb = new unsigned char[size];
-	int asize = xw->nb_sample * xw->inChannels * 2;
-	unsigned char* pcm = new unsigned char[size];
+	X_S16 = 1,
+	X_FLATP = 8
+};
+class XVideoWriter
+{
+public:
+	//视频输入参数
+	int inWidth = 848;
+	int inHeight = 480;
+	int inPixFMT = 30; //AV_POX_PMT_BGRA
 	
-	xw->WriteHead();
-	for(;;)
-	{
-		AVPacket* pkt = NULL;
-		int len = NULL;
-		if (xw->isVideoBefore())
-		{
-			len = fread(rgb, 1, size, fp);
-			if (len <= 0)break;
-			pkt = xw->EncodeVideo(rgb);
-			if (pkt)
-			{
-				cout << ".";
-			}
-			else
-			{
-				cout << "-";
-				continue;
-			}
-			if (xw->WriteFrame(pkt))
-			{
-				cout << "+";
-			}
-		}
-		else
-		{
-			len = fread(pcm, 1, asize, fa);
-			if (len <= 0)break;
-			pkt = xw->EncodeAudio(pcm);
-			xw->WriteFrame(pkt);
-		}
-		
+	//音频输入参数
+	int inSampleRate = 44100;
+	int inChannels = 2;
+	XSAMPLEFMT inSampleFmt = X_S16;
+	
+	//视频输出参数
+	int vBtrate = 4000000;
+	int outWidth = 848;
+	int outheight = 480;
+	int outFPS = 25;
 
-		
-		
-	}
-	xw->WriteEnd();
-	delete rgb;
-	rgb = NULL;
-	return 0;
-}
+	//音频输出参数
+	int aBitrate = 6400;
+	int outChannels = 2;
+	int outSampleRate = 44100;
+	XSAMPLEFMT outSampleFmt = X_FLATP;
+	int nb_sample = 1024;
+
+
+	virtual bool Init(const char* file) = 0;
+	virtual void Close() = 0;
+	virtual bool ADDVideoStream() = 0;
+	virtual bool ADDAudioStream() = 0;
+	virtual AVPacket *EncodeVideo(const unsigned char* rgb) = 0;
+	virtual AVPacket *EncodeAudio(const unsigned char* pcmb) = 0;
+	virtual bool WriteHead() = 0;
+	virtual bool WriteEnd() = 0;
+	virtual bool isVideoBefore() = 0;
+	//会释放pkt的空间
+	virtual bool WriteFrame(AVPacket *pkt) = 0;
+	static XVideoWriter* Get(unsigned short index = 0);
+	~XVideoWriter();
+	std::string filename;
+
+	
+protected:
+	XVideoWriter();
+};
+
