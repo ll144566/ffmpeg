@@ -79,14 +79,13 @@ int main()
 	frame->channels = 2;
 	frame->channel_layout =  AV_CH_LAYOUT_STEREO;
 	frame->nb_samples = 1024;//音频单个声道中的采样点数目
-	//ret = av_frame_get_buffer(frame, 0);
+	ret = av_frame_get_buffer(frame, 0);
 	if (ret != 0)
 		Xexit("av_frame_get_buffer error");
 	int readSize = frame->nb_samples * 2*2;
 	char* pcm = new char[readSize];
 	FILE * fp = fopen(infile, "rb");
 
-	int cash = 2;
 	for (;;)
 	{
 		int len = fread(pcm, 1, readSize, fp);
