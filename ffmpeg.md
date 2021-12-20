@@ -1,6 +1,18 @@
-[FFmpeg:AVPacket结构体分析](https://blog.csdn.net/qq_25333681/article/details/89743621)
+# 结构体
+
+## AVFormatContext
+
+关闭一个AVFormatContext，和avformat_open_input()成对使用。声明位于libavformat\avformat.h
+
+**avformat_find_stream_info()**
+
+经过avformat_open_input()调用后已经解析一部分的码流编码信息，但可能不完整不正确。需要进一步调用此函数读取一部分视音频数据并且获得更加完善的编码信息，特别是对于一些无文件头的输入是必要的。
+
+
 
 ## AVPacket
+
+[FFmpeg:AVPacket结构体分析](https://blog.csdn.net/qq_25333681/article/details/89743621)
 
 在AVPacket结构体的说明部分：有这么一段描述，足够说明它的作用和重要性。
 
@@ -103,7 +115,9 @@ AVFrame 的用法：
 AVPacket: 存储解码前数据(编码数据:H264/AAC等)
 AVFrame: 存储解码后数据(像素数据:YUV/RGB/PCM等)
 
+### 判断AVFrame是否为关键帧
 
+通过key_frame判断是否为关键帧。或者 enum AVPictureType pict_type;也行。
 
 ### av_frame_get_buffer
 
@@ -114,19 +128,35 @@ Required buffer size alignment.  If equal to 0, alignment will be chosen automat
 
 ### [音频处理基本概念及音频重采样](https://www.cnblogs.com/jiayayao/p/8724663.html)
 
-### sws_scale
+
+
+# 函数
+
+## sws_scale
 
 [FFmpeg: FFmepg中的sws_scale() 函数分析](https://www.cnblogs.com/yongdaimi/p/10715830.html)
 
-# [FFmpeg: FFmepg中的sws_scale() 函数分析](https://www.cnblogs.com/yongdaimi/p/10715830.html)
+## [FFmpeg: FFmepg中的sws_scale() 函数分析](https://www.cnblogs.com/yongdaimi/p/10715830.html)
 
 FFmpeg中的 sws_scale() 函数主要是用来做视频像素格式和分辨率的转换，其优势在于：可以在同一个函数里实现：1.图像色彩空间转换， 2:分辨率缩放，3:前后图像滤波处理。不足之处在于：效率相对较低，不如libyuv或shader，
 
 
 
+## AVFrame
+
+1、av_frame_alloc()：申请AVFrame结构体空间，同时会对申请的结构体初始化。注意哦，这个函数只是创建AVFrame结构的空间，AVFrame中的uint8_t *data[AV_NUM_DATA_POINTERS]空间此时NULL，不会创建的。
+
+2、av_frame_free():释放AVFrame的结构体空间。这个函数就有点意思了。因为他不仅仅释放结构体空间，还涉及到AVFrame中的uint8_t *data[AV_NUM_DATA_POINTERS];字段的释放问题。，如果AVFrame中的uint8_t *data[AV_NUM_DATA_POINTERS]中的引用==1，则释放data的空间。
+
+3、int av_frame_ref(AVFrame *dst, const AVFrame *src):对已有AVFrame的引用，这个引用做了两个动作：1、将src属性内容复制到dst，2、对AVFrame中的uint8_t *data[AV_NUM_DATA_POINTERS]字段引用计数+1。
+
+4、void av_frame_unref(AVFrame *frame);对frame释放引用，做了两个动作：1、将frame的各个属性初始化，2、如果AVFrame中的uint8_t *data[AV_NUM_DATA_POINTERS]中的引用==1，则释放data的空间。当然，如果data的引用计数>1则由别的frame去检测释放。
+
+5、av_frame_get_buffer()：这个函数是建立AVFrame中的uint8_t *data[AV_NUM_DATA_POINTERS]内存空间，使用这个函数之前frame结构中的format、width、height：必须赋值，要不然函数怎么知道创建多少字节的空间呢！
 
 
 
+# ffmpeg 命令
 
 mp4转yuv
 
@@ -171,9 +201,9 @@ ffmpeg -i test.mp4 -f s16le test.pcm
 
 调用了avformat_find_stream_info获取到的音视频流信息更完整
 
+# 音频
 
-
-# 音频帧概念详解
+## 音频帧概念详解
 
 常人听觉的频率范围大约在20Hz~20kHz之间。
 
@@ -239,123 +269,65 @@ Cb：反映的是RGB输入信号蓝色部分与RGB信号亮度值之间的差异
 
 Cr：反映了RGB输入信号红色部分与RGB信号亮度值之间的差异。
 
+##  关于音频的一些基础知识
+
+[FFmpeg学习3：播放音频](https://www.cnblogs.com/wangguchangqing/p/5788805.html)
+
+和视频一样，音频数据也会被打包到一个容器中，其文件的扩展名并不是其编码的方法，只是其打包文件的格式。
+现实世界中，我们所听到的声音是一个个连续的波形，但是计算机无法存储和处理这种拥有无限点的波形数据。所以通过**重采样**，按照一定的
+频率（1秒采集多少个点），将有无限个点的连续波形数据转换为有有限个点的离散数据，这就是通常说的A/D转换（模数转换，将模拟数据转换为数字数据）。
+通过上面转换过程的描述可以知道，一个数字音频通常由以下三个部分组成：
+
+- **采样频率** 采样是在拥有无限个点的连续波形上选取有限个离散点，采集到的离散点越多，也就越能真实的波形。由于声音是在时间上的连续波形，其采样点的间隔就是两次采样的时间间隔。通俗来说，采样率指的是**每秒钟采样的点数**，单位为HZ。采样率的倒数是采样周期，也就是两次采样的时间间隔。采样率越大，则采集到的样本点数就越多，采样得到的数字音频也就更接近真实的声音波形，相应的其占用的存储空间也就越大。常用的采样频率有：
+  - 22k Hz 无限广播所用的采样率
+  - 44.1k Hz CD音质
+  - 48k Hz 数字电视，DVD
+  - 96k Hz 192k Hz 蓝光盘，高清DVD
+- **采样精度** 采集到的点被称为样本（sample），每个样本占用的位数就是采样精度。这点和图像的像素表示比较类似，可以使用8bit，16bit或者24bit来表示采集到的一个样本。同样，一个样本占用的空间越大其表示的就越接近真实的声音。
+- **通道** 支持不同发声的音响的个数。常用的声道有单声道、双声道、4声道、5.1声道等。不同的声道在采样的时候是不同的，例如双声道，在每次采样的时候有采集两个样本点。
+
+- 比特率
+
+   
+
+  指的是每秒传送的比特（bit）数，其单位是bps（Bit Per Second），是间接衡量声音质量的一个标准。
+
+  - 没有压缩编码的音频数据，其比特率 = 采样频率 * 采样精度 * 通道数，通过该公式可以看出，比特率越高，采样得到的声音质量就越高，相应的占用的存储空间也就越大。
+  - 经过压缩编码后的音频数据也有一个比特率，这时候的比特率也可以称之为**码率**，因为其反映了压缩编码的效率。码率越高，压缩后的数据越大，得到音频质量越好，相应的压缩的效率也就越低。
+    码率 = 音频文件的大小 / 时长，在时长一定的情况下，码率越高则音频文件越大，其音频的品质也就越高。常见的一些码率：
+    - 96 Kbps FM质量
+    - 128 - 160 Kbps 比较好的音频质量
+    - 192Kbps CD质量
+    - 256Kbps 320Kbps 高质量音频
+
+通常我们所说的比特率（码率）指的是编码后的每秒钟的数据量。码率越高，压缩比就越小，音频文件就越大，相对的音频质量也就越好。码率可以反映出音频的质量，码率越高，音频质量就越，反之亦然。
 
 
-~~~c
-#pragma comment(lib,"avformat.lib")
-#pragma comment(lib,"avutil.lib")
-#pragma comment(lib,"avcodec.lib")
-#pragma comment(lib,"swscale.lib")
-extern "C" {
-#include <libavformat/avformat.h>
-#include <libswscale/swscale.h>
-}
-static double r2d(AVRational r) {
-	return r.num == 0 || r.den == 0 ? 0. : (double)r.num / (double)r.den;
-}
-int main(int argc, char* argv[])
-{
-	av_register_all();
-	char path[] = "v1080.mp4";
-	AVFormatContext* ac = NULL;
-	int re = avformat_open_input(&ac, path, 0, 0);
-
-	if (re != 0) {//打开文件失败
-		char buf[1024] = { 0 };
-		av_strerror(re, buf, sizeof(buf));
-		printf("file %s open failed because of : %s", path, buf);
-		getchar();
-		return -1;
-	}
-
-	int totalSec = ac->duration / AV_TIME_BASE;
-	printf("指定的视频文件有 %d分%d秒\n", totalSec / 60, totalSec % 60);
-
-	int videoStream = 0;
-	AVCodecContext* videoCtx = NULL;
-	SwsContext* cCtx = NULL;
-	int outWidth = 640;
-	int outHeight = 480;
-	char* rgb = new char[outWidth * outHeight * 4];
-
-	for (int i = 0; i < ac->nb_streams; i++)
-	{
-		AVCodecContext* enc = ac->streams[i]->codec;
-
-		if (enc->codec_type == AVMEDIA_TYPE_VIDEO) {
-			videoStream = i;
-			videoCtx = enc;
-			AVCodec* codec = avcodec_find_decoder(enc->codec_id);
-			if (!codec) {
-				printf("无法解码此视频文件\n");
-				return -1;
-			}
-			int err = avcodec_open2(enc, codec, NULL);
-			if (err != 0) {
-				char buf[1024] = { 0 };
-				av_strerror(err, buf, sizeof(buf));
-				printf(buf);
-				return -2;
-			}
-			printf("\n");
-			printf("成功打开视频编码流\n");
-		}
-	}
-	AVFrame* yuv = av_frame_alloc();
-	for (;;) {
-		AVPacket pkt;
-		re = av_read_frame(ac, &pkt);
-		if (re != 0) {
-			break;
-		}
-		if (pkt.stream_index != videoStream)
-		{
-			av_packet_unref(&pkt);
-			continue;
-		}
-		int pts = pkt.pts * r2d(ac->streams[pkt.stream_index]->time_base) * 1000;//得到帧的毫秒值
 
 
-		int re = avcodec_send_packet(videoCtx, &pkt);
-		if (re != 0) {
-			av_packet_unref(&pkt);
-			continue;
-		}
-		re = avcodec_receive_frame(videoCtx, yuv);
-		if (re != 0) {
-			av_packet_unref(&pkt);
-			continue;
-		}
-		printf("[D]___");
 
-		//打开ffmpeg格式转换和缩放器
-		cCtx = sws_getCachedContext(cCtx, videoCtx->width, videoCtx->height, videoCtx->pix_fmt,
-			outWidth, outHeight, AV_PIX_FMT_BGRA, SWS_BICUBIC,
-			NULL, NULL, NULL);
-		if (!cCtx) {
-			printf("sws_getCachedContext failed!\n");
-			break;
-		}
-		uint8_t* data[AV_NUM_DATA_POINTERS] = { 0 };
-		data[0] = (uint8_t*)rgb;
-		int linesize[AV_NUM_DATA_POINTERS] = { 0 };
-		linesize[0] = outWidth * 4;
-		int h = sws_scale(cCtx, yuv->data, yuv->linesize, 0, videoCtx->height, data, linesize);
-		if (h > 0) {
-			printf("(%d)", h);
-		}
-		printf("pts = %d 毫秒\n", pts);
-		av_packet_unref(&pkt);
-	}
+视频播放一般需经过以下几个步骤：解协议，解封装，解码视音频，视音频同步。
 
-	if (cCtx) {
-		sws_freeContext(cCtx);
-		cCtx = NULL;
-	}
+- **解协议：**将流媒体协议的数据，解析为标准的相应的封装格式数据。视音频在网络上传播的时候，常常采用各种流媒体协议，例如RTSP，RTMP等等。这些协议在传输视音频数据的同时，也会传输一些信令数据。这些信令数据包括对播放的控制（播放，暂停，停止），或者对网络状态的描述等。解协议过程中会去除掉信令数据而只保留视音频数据。例如，采用RTMP协议传输的数据，经过解协议操作后，输出FLV格式的数据。
+- **解封装：**将输入的封装格式的数据，分离成为音频流压缩编码数据和视频流压缩编码数据。封装格式种类很多，例如MP4，MKV，RMVB，TS，FLV，AVI等等，它的作用就是将已经压缩编码的视频数据和音频数据按照一定的格式放到一起。例如，FLV格式的数据，经过解封装操作后，输出H.264编码的视频码流和AAC编码的音频码流。
+- **解码**：将视频/音频压缩编码数据，解码成为非压缩的视频/音频原始数据。音频的压缩编码标准包含AAC，MP3，AC-3等等，视频的压缩编码标准则包含H.264，MPEG2，VC-1等等。解码是整个系统中最重要也是最复杂的一个环节。通过解码，压缩编码的视频数据输出成为非压缩的颜色数据，例如YUV420P，RGB等等；压缩编码的音频数据输出成为非压缩的音频抽样数据，例如PCM数据。
+- **视音频同步：**根据解封装模块处理过程中获取到的参数信息，同步解码出来的视频和音频数据，并将视频音频数据送至系统的显卡和声卡播放出来。
 
-	avformat_close_input(&ac);
-	ac = NULL;
 
-	return 0;
-}
-~~~
+
+# YUV格式分析
+
+[YUV格式分析详解](https://blog.csdn.net/wudebao5220150/article/details/13295603)
+
+[YUV介绍](https://www.cnblogs.com/sddai/p/10302979.html)
+
+[详解YUV颜色体系](https://www.jianshu.com/p/e4944a2707bc)
+
+
+
+
+
+# 博客学习
+
+[音视频编解码](https://blog.csdn.net/wanggao_1990/category_10981719.html)
+
